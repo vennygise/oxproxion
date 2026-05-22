@@ -1461,6 +1461,10 @@ class ChatFragment : Fragment(R.layout.fragment_chat), OnKeyboardShortcutListene
                         dialog.dismiss()
                     }
                     .setPositiveButton("Edit") { _, _ ->
+                        selectedImageBytes = null
+                        selectedImageMime = null
+                        attachmentPreviewContainer.visibility = View.GONE
+                        viewModel.setPendingUserImageUri(null)
                         viewModel.truncateHistory(position)
                         chatEditText.setText(text)
                         chatEditText.setSelection(text.length)

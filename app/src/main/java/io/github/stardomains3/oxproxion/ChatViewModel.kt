@@ -818,11 +818,31 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     // NEW: Specialized resend for existing user prompt (keeps original UI bubble intact)
     fun resendExistingPrompt(userMessageIndex: Int, systemMessage: String? = null) {
         if (userMessageIndex < 0 || userMessageIndex >= (_chatMessages.value?.size ?: 0)) {
+
             return
         }
 
         val currentMessages = _chatMessages.value ?: emptyList()
         val userMessage = currentMessages[userMessageIndex]
+
+        // Restore pendingUserImageUri from the message content if not already set
+        if (pendingUserImageUri == null) {
+            val contentArray = userMessage.content as? JsonArray
+            val imageUrl = contentArray?.find { item ->
+                (item as? JsonObject)?.get("type")?.jsonPrimitive?.contentOrNull == "image_url"
+            }?.jsonObject?.get("image_url")?.jsonObject?.get("url")?.jsonPrimitive?.contentOrNull
+
+            if (imageUrl != null) {
+                pendingUserImageUri = imageUrl
+            }
+        }
+
+        // CRITICAL: Attach the image URI to the user message for the API call
+        val messageWithImage = if (pendingUserImageUri != null) {
+            userMessage.copy(imageUri = pendingUserImageUri)
+        } else {
+            userMessage
+        }
 
         truncateHistory(userMessageIndex + 1)
 
@@ -837,8 +857,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         messagesForApiRequest.addAll(currentMessages.take(userMessageIndex))
-        messagesForApiRequest.add(userMessage)
-        //new for msg count
+        // Use messageWithImage instead of userMessage
+        messagesForApiRequest.add(messageWithImage)
         val memoryCount = sharedPreferencesHelper.getChatMemoryCount()
         if (messagesForApiRequest.size > memoryCount) {
             // Keep system message if present, then keep last N messages
@@ -850,6 +870,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             messagesForApiRequest.addAll(systemMessages)
             messagesForApiRequest.addAll(recentMessages)
         }
+
         val uiMessages = _chatMessages.value?.toMutableList() ?: mutableListOf()
         uiMessages.add(THINKING_MESSAGE)
         _chatMessages.value = uiMessages
@@ -883,23 +904,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
                 if (activeModelIsLan()) {
                     if (_isStreamingEnabled.value == true) {
-                        handleStreamedResponseLAN(modelForRequest, messagesForApiRequest,
-                           THINKING_MESSAGE
-                        )
+                        handleStreamedResponseLAN(modelForRequest, messagesForApiRequest, THINKING_MESSAGE)
                     } else {
-                        handleNonStreamedResponseLAN(modelForRequest, messagesForApiRequest,
-                          THINKING_MESSAGE
-                        )
+                        handleNonStreamedResponseLAN(modelForRequest, messagesForApiRequest, THINKING_MESSAGE)
                     }
                 } else {
                     if (_isStreamingEnabled.value == true) {
-                        handleStreamedResponse(modelForRequest, messagesForApiRequest,
-                            THINKING_MESSAGE
-                        )
+                        handleStreamedResponse(modelForRequest, messagesForApiRequest, THINKING_MESSAGE)
                     } else {
-                        handleNonStreamedResponse(modelForRequest, messagesForApiRequest,
-                            THINKING_MESSAGE
-                        )
+                        handleNonStreamedResponse(modelForRequest, messagesForApiRequest, THINKING_MESSAGE)
                     }
                 }
             } catch (e: Throwable) {

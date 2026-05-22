@@ -1,0 +1,3 @@
+- If you edit an older message with an image, you will need to reattach before sending.
+- Fixed an issue with resending an older message with an image where the image data wasn't being resent with the message.
+- Updated a bunch of dependencies.
